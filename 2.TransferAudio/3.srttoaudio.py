@@ -103,13 +103,13 @@ def speedup(input_file: str, original_duration: float, target_duration: float, o
     os.replace(temp_output, output_file)
 
 total = 0
-def adjust(input_path):
+def adjust(input_path, speed):
     global total
     subs = pysrt.open(input_path, encoding="utf-8")
     for sub in subs:
         print(sub.index, sub.start, sub.end, sub.text)
         duration = (sub.end.ordinal - sub.start.ordinal) / 1000.0
-        create_tts_with_speed(sub.text, lang="vi", speed=1.8, output_file=f"tmp{sub.index}.mp3")
+        create_tts_with_speed(sub.text, lang="vi", speed=speed, output_file=f"tmp{sub.index}.mp3")
         tmp_duration = get_mp3_duration(f"tmp{sub.index}.mp3")
         difference = duration - tmp_duration
         if difference > 0:
@@ -141,5 +141,5 @@ def merge(total):
 
 if __name__ == "__main__":
     input_path = r"C:\Users\ngodu\Desktop\Videos\2.TransferAudio\srt\output.srt"
-    adjust(input_path)
+    adjust(input_path, speed=1.5)
     merge(total)
