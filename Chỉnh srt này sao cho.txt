@@ -1,0 +1,8 @@
+Chỉnh srt này sao cho:
+- output vẫn chuẩn form tôi đưa bạn
+- dịch qua tiếng việt
+- từng câu đều đúng timeline
+- phong cách nói chuyện genz
+- số đều quy ra chữ hết
+- các câu đều có số từ phù hợp tốc độ đọc là 190 từ/phút, dài thì làm ngắn lại, ngắn thì làm dài lên(cần thật kĩ yếu tố này).
+- mọi tên tiếng nước ngoài đều phải quy về thuần việt và phải đồng bộ với srt trước đó.
