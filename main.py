@@ -33,8 +33,8 @@ MIN_VIDEO_DURATION_SECONDS = 5
 # Set OPENAI_API_KEY in your shell before running, or paste it locally here.
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = "gpt-4o-mini"
-TRANSCRIBE_PROVIDER = os.getenv("TRANSCRIBE_PROVIDER", "local")
-WHISPER_MODEL = os.getenv("WHISPER_MODEL", "large")
+TRANSCRIBE_PROVIDER = os.getenv("TRANSCRIBE_PROVIDER", "openai")
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "medium")
 OPENAI_TRANSCRIBE_MODEL = os.getenv("OPENAI_TRANSCRIBE_MODEL", "whisper-1")
 TRANSLATE_WORDS_PER_MINUTE = 190
 TRANSLATE_BATCH_SIZE = 12

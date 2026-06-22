@@ -1,11 +1,11 @@
 # Review Film Pipeline
 
-Pipeline tu dong de tai video Douyin, tach audio, tao SRT bang Whisper, dich/bien tap SRT sang tieng Viet bang OpenAI API, tao voice TTS tieng Viet, ghep lai video va lam sach metadata dau ra.
+Pipeline tu dong de tai video Douyin, tach audio, tao SRT bang OpenAI transcription API, dich/bien tap SRT sang tieng Viet bang OpenAI API, tao voice TTS tieng Viet, ghep lai video va lam sach metadata dau ra.
 
 Ban nay co the chay theo 2 kieu:
 
 - Local CLI: chay truc tiep tren may.
-- API server: goi HTTP API de job chay tren may ao/VM.
+- API server: goi HTTP API de job chay tren may ao/VM/container.
 
 ## Yeu Cau
 
@@ -15,7 +15,7 @@ Ban nay co the chay theo 2 kieu:
 - Internet
 - OpenAI API key
 
-Neu chay tren Azure VM co GPU, nen dung Ubuntu 22.04/24.04 va VM dong NVIDIA T4 nhu `Standard_NC4as_T4_v3` hoac cao hon.
+Khong can GPU neu dung cau hinh mac dinh `TRANSCRIBE_PROVIDER=openai`.
 
 ## Cai Dat
 
@@ -131,8 +131,8 @@ API hien chay queue tuan tu 1 job/luc de tranh xung dot file tam trong pipeline.
 
 ## Chay Bang Docker
 
-Docker image duoc toi uu cho chi phi thap: mac dinh dung OpenAI transcription API thay vi local Whisper, nen khong can GPU va khong cai PyTorch/Whisper trong image.
-Container cung mac dinh chay Chrome headless (`HEADLESS=1`) de hop App Service/Container Apps.
+Docker image duoc toi uu de chay re tren CPU: mac dinh dung OpenAI `whisper-1` transcription API de lay SRT, khong cai PyTorch/Whisper local va khong can GPU.
+Container mac dinh chay Chrome headless (`HEADLESS=1`) de hop App Service/Container Apps/VM.
 
 Build image:
 
@@ -162,7 +162,7 @@ docker run --rm -p 8000:8000 `
 
 Sau do goi API nhu phan `Chay Bang API`.
 
-Profile tiet kiem chi phi:
+Profile khuyen dung cho App Service/VM CPU:
 
 ```text
 TRANSCRIBE_PROVIDER=openai
@@ -170,14 +170,7 @@ OPENAI_TRANSCRIBE_MODEL=whisper-1
 OPENAI_MODEL=gpt-4o-mini
 ```
 
-Profile local Whisper, ton CPU/GPU hon:
-
-```text
-TRANSCRIBE_PROVIDER=local
-WHISPER_MODEL=base|small|medium|large
-```
-
-Neu chay local Whisper trong Docker, can dung `requirements.txt` thay vi `requirements-docker.txt` va nen chay tren VM GPU. Mac dinh Docker khong cai local Whisper de image nhe va App Service/Container Apps CPU re hon.
+Ly do dung `whisper-1`: pipeline can SRT de giu timeline. OpenAI `whisper-1` ho tro output `srt`; cac model transcription moi hon nhu `gpt-4o-transcribe` co do chinh xac cao hon trong docs, nhung khong ho tro output SRT truc tiep tai thoi diem nay. Neu OpenAI cap nhat model moi co ho tro SRT, chi can doi `OPENAI_TRANSCRIBE_MODEL`.
 
 ## Deploy Azure App Service Container
 
@@ -197,7 +190,7 @@ PORT=8000
 WEBSITES_PORT=8000
 ```
 
-App Service phu hop neu ban uu tien chi phi va dung `TRANSCRIBE_PROVIDER=openai`. Neu workload can local Whisper/GPU, Azure Container Apps GPU hoac VM GPU se hop hon.
+App Service phu hop neu ban uu tien chi phi va dung `TRANSCRIBE_PROVIDER=openai`, vi container nhe hon va khong phu thuoc GPU.
 
 ## Cai Dat Tren Azure VM
 
@@ -206,12 +199,6 @@ Ubuntu:
 ```bash
 sudo apt update
 sudo apt install -y git python3 python3-venv python3-pip ffmpeg chromium-browser
-```
-
-Neu dung GPU VM, cai NVIDIA driver theo Azure N-series GPU driver extension hoac huong dan cua Microsoft. Kiem tra:
-
-```bash
-nvidia-smi
 ```
 
 Clone repo va cai dependencies nhu phan Cai Dat. Sau do chay API bang `uvicorn`.
@@ -235,7 +222,7 @@ Output van con metadata ky thuat MP4 binh thuong nhu `major_brand`, `compatible_
 Trong `main.py`:
 
 - `OPENAI_MODEL`
-- `TRANSCRIBE_PROVIDER`
+- `TRANSCRIBE_PROVIDER` (`openai` mac dinh; `local` chi dung khi ban tu cai them Whisper)
 - `OPENAI_TRANSCRIBE_MODEL`
 - `WHISPER_MODEL`
 - `TRANSLATE_WORDS_PER_MINUTE`
@@ -258,4 +245,10 @@ Tag on dinh dau tien cua ban API + local la:
 
 ```text
 v1.0-local-api-base
+```
+
+Tag Docker CPU/API gon nhe:
+
+```text
+v1.2-cost-optimized-docker
 ```

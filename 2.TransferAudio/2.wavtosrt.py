@@ -5,8 +5,8 @@ from pathlib import Path
 import requests
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-TRANSCRIBE_PROVIDER = os.getenv("TRANSCRIBE_PROVIDER", "local").lower()
-WHISPER_MODEL = os.getenv("WHISPER_MODEL", "large")
+TRANSCRIBE_PROVIDER = os.getenv("TRANSCRIBE_PROVIDER", "openai").lower()
+WHISPER_MODEL = os.getenv("WHISPER_MODEL", "medium")
 OPENAI_TRANSCRIBE_MODEL = os.getenv("OPENAI_TRANSCRIBE_MODEL", "whisper-1")
 
 
@@ -15,7 +15,14 @@ def convert_wav_to_srt(wav_file, output_srt_path, target_segments=50):
         convert_wav_to_srt_openai(wav_file, output_srt_path)
         return
 
-    import whisper
+    try:
+        import whisper
+    except ImportError:
+        if TRANSCRIBE_PROVIDER == "auto":
+            print("Local Whisper is not installed. Falling back to OpenAI transcription API.")
+            convert_wav_to_srt_openai(wav_file, output_srt_path)
+            return
+        raise
 
     model = whisper.load_model(WHISPER_MODEL)
     result = model.transcribe(str(wav_file), word_timestamps=True)
