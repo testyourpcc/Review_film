@@ -26,6 +26,8 @@ class VideoURLExtractor:
         chrome_options.add_argument("--start-maximized")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
+        if os.getenv("HEADLESS", "0") == "1":
+            chrome_options.add_argument("--headless=new")
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option("useAutomationExtension", False)
         chrome_options.set_capability("goog:loggingPrefs", {"performance": "ALL"})

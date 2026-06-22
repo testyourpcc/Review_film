@@ -3,6 +3,9 @@
 __pycache__
 *.pyc
 .env
+driver/
+requirements.txt
+*.md
 
 1.DownloadVideos/output/
 1.DownloadVideos/output_link_video.txt

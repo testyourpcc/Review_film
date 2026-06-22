@@ -131,6 +131,9 @@ API hien chay queue tuan tu 1 job/luc de tranh xung dot file tam trong pipeline.
 
 ## Chay Bang Docker
 
+Docker image duoc toi uu cho chi phi thap: mac dinh dung OpenAI transcription API thay vi local Whisper, nen khong can GPU va khong cai PyTorch/Whisper trong image.
+Container cung mac dinh chay Chrome headless (`HEADLESS=1`) de hop App Service/Container Apps.
+
 Build image:
 
 ```bash
@@ -143,6 +146,7 @@ Run API container:
 docker run --rm -p 8000:8000 \
   -e OPENAI_API_KEY="YOUR_OPENAI_KEY" \
   -e PIPELINE_API_KEY="your-secret" \
+  -e TRANSCRIBE_PROVIDER="openai" \
   review-film-pipeline
 ```
 
@@ -152,12 +156,28 @@ Windows PowerShell:
 docker run --rm -p 8000:8000 `
   -e OPENAI_API_KEY="YOUR_OPENAI_KEY" `
   -e PIPELINE_API_KEY="your-secret" `
+  -e TRANSCRIBE_PROVIDER="openai" `
   review-film-pipeline
 ```
 
 Sau do goi API nhu phan `Chay Bang API`.
 
-Luu y: image Docker mac dinh dung CPU. Whisper `large` se nang neu chay tren CPU, nen App Service chi hop de chay job nhe/thu nghiem. Neu muon xu ly nhanh va do nang may that su, nen chay container nay tren Azure VM GPU hoac Azure Container Apps co GPU.
+Profile tiet kiem chi phi:
+
+```text
+TRANSCRIBE_PROVIDER=openai
+OPENAI_TRANSCRIBE_MODEL=whisper-1
+OPENAI_MODEL=gpt-4o-mini
+```
+
+Profile local Whisper, ton CPU/GPU hon:
+
+```text
+TRANSCRIBE_PROVIDER=local
+WHISPER_MODEL=base|small|medium|large
+```
+
+Neu chay local Whisper trong Docker, can dung `requirements.txt` thay vi `requirements-docker.txt` va nen chay tren VM GPU. Mac dinh Docker khong cai local Whisper de image nhe va App Service/Container Apps CPU re hon.
 
 ## Deploy Azure App Service Container
 
@@ -171,11 +191,13 @@ Azure App Service ho tro custom Docker image cho Linux App Service. Cach di don 
 ```text
 OPENAI_API_KEY=YOUR_OPENAI_KEY
 PIPELINE_API_KEY=your-secret
+TRANSCRIBE_PROVIDER=openai
+OPENAI_TRANSCRIBE_MODEL=whisper-1
 PORT=8000
 WEBSITES_PORT=8000
 ```
 
-App Service phu hop khi ban muon endpoint API de goi job tu xa va video khong qua nang. Neu workload can GPU cho Whisper, Azure Container Apps GPU hoac VM GPU se hop hon.
+App Service phu hop neu ban uu tien chi phi va dung `TRANSCRIBE_PROVIDER=openai`. Neu workload can local Whisper/GPU, Azure Container Apps GPU hoac VM GPU se hop hon.
 
 ## Cai Dat Tren Azure VM
 
@@ -213,6 +235,9 @@ Output van con metadata ky thuat MP4 binh thuong nhu `major_brand`, `compatible_
 Trong `main.py`:
 
 - `OPENAI_MODEL`
+- `TRANSCRIBE_PROVIDER`
+- `OPENAI_TRANSCRIBE_MODEL`
+- `WHISPER_MODEL`
 - `TRANSLATE_WORDS_PER_MINUTE`
 - `TRANSLATE_BATCH_SIZE`
 - `TRANSLATE_REVIEW_PASSES`
