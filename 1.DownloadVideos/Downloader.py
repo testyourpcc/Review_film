@@ -1,4 +1,5 @@
 import json
+import os
 import time
 from pathlib import Path
 
@@ -23,9 +24,15 @@ class VideoURLExtractor:
         chrome_options = Options()
         chrome_options.add_argument("--disable-blink-features=AutomationControlled")
         chrome_options.add_argument("--start-maximized")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option("useAutomationExtension", False)
         chrome_options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
+
+        chrome_binary = os.getenv("CHROME_BIN")
+        if chrome_binary:
+            chrome_options.binary_location = chrome_binary
 
         try:
             service = Service(self.chromedriver_path)

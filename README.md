@@ -129,6 +129,54 @@ curl http://YOUR_VM_IP:8000/jobs/JOB_ID/log \
 
 API hien chay queue tuan tu 1 job/luc de tranh xung dot file tam trong pipeline.
 
+## Chay Bang Docker
+
+Build image:
+
+```bash
+docker build -t review-film-pipeline .
+```
+
+Run API container:
+
+```bash
+docker run --rm -p 8000:8000 \
+  -e OPENAI_API_KEY="YOUR_OPENAI_KEY" \
+  -e PIPELINE_API_KEY="your-secret" \
+  review-film-pipeline
+```
+
+Windows PowerShell:
+
+```powershell
+docker run --rm -p 8000:8000 `
+  -e OPENAI_API_KEY="YOUR_OPENAI_KEY" `
+  -e PIPELINE_API_KEY="your-secret" `
+  review-film-pipeline
+```
+
+Sau do goi API nhu phan `Chay Bang API`.
+
+Luu y: image Docker mac dinh dung CPU. Whisper `large` se nang neu chay tren CPU, nen App Service chi hop de chay job nhe/thu nghiem. Neu muon xu ly nhanh va do nang may that su, nen chay container nay tren Azure VM GPU hoac Azure Container Apps co GPU.
+
+## Deploy Azure App Service Container
+
+Azure App Service ho tro custom Docker image cho Linux App Service. Cach di don gian:
+
+1. Build image.
+2. Push len Azure Container Registry.
+3. Tao App Service Linux custom container tro toi image do.
+4. Set app settings:
+
+```text
+OPENAI_API_KEY=YOUR_OPENAI_KEY
+PIPELINE_API_KEY=your-secret
+PORT=8000
+WEBSITES_PORT=8000
+```
+
+App Service phu hop khi ban muon endpoint API de goi job tu xa va video khong qua nang. Neu workload can GPU cho Whisper, Azure Container Apps GPU hoac VM GPU se hop hon.
+
 ## Cai Dat Tren Azure VM
 
 Ubuntu:
