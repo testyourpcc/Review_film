@@ -225,6 +225,7 @@ def collect_merged_video(output_dir, output_index):
     merged_video = created[0]
     final_path = output_dir / f"{output_index}.mp4"
     if final_path.resolve() == merged_video.resolve():
+        sanitize_final_video(final_path)
         return final_path
 
     remove_path(final_path)

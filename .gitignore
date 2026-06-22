@@ -12,6 +12,7 @@ __pycache__/
 3.Merge/*.mp4
 4.Final/*.mp4
 output/
+jobs/
 
 # Temporary audio chunks from TTS timing
 tmp*.mp3
