@@ -1,5 +1,8 @@
 # srt_word_suggestion.py
 import pysrt
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def srt_time_to_seconds(time):
     """Chuyển đổi đối tượng pysrt.SubRipTime → giây (float)."""
@@ -16,7 +19,7 @@ def suggest_words_for_srt(
       - Nếu số từ hiện tại trong khoảng ±2 so với lý tưởng, báo là đã đạt chuẩn (kèm số từ hiện tại).
       - Ngược lại, báo cần chính xác X từ để tối ưu (hiện tại Y từ).
     """
-    subs = pysrt.open(srt_file, encoding="utf-8")
+    subs = pysrt.open(str(srt_file), encoding="utf-8")
     lines = []
 
     for idx, sub in enumerate(subs, start=1):
@@ -46,5 +49,6 @@ def suggest_words_for_srt(
 
 if __name__ == "__main__":
     # === ĐỔI ĐƯỜNG DẪN CHO PHÙ HỢP ===
-    srt_path = r"C:\Users\ngodu\Desktop\Videos\2.TransferAudio\srt\output.srt"
-    suggest_words_for_srt(srt_path, target_rate=190)
+    srt_path = PROJECT_ROOT / "2.TransferAudio" / "srt" / "output.srt"
+    alert_path = PROJECT_ROOT / "alert.txt"
+    suggest_words_for_srt(srt_path, target_rate=190, alert_path=alert_path)

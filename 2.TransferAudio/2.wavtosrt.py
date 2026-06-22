@@ -1,12 +1,15 @@
 import whisper
 import math
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def convert_wav_to_srt(wav_file, output_srt_path, target_segments=50):
     # Load Whisper model (adjust size as needed)
     model = whisper.load_model("large")  # or "large"
 
     # Transcribe with word timestamps
-    result = model.transcribe(wav_file, word_timestamps=True)
+    result = model.transcribe(str(wav_file), word_timestamps=True)
     segments = result["segments"]
 
     # If segments already <= target, write directly
@@ -47,6 +50,7 @@ def convert_wav_to_srt(wav_file, output_srt_path, target_segments=50):
 
 
 if __name__ == '__main__':
-    wav = r'C:\Users\ngodu\Desktop\Videos\2.TransferAudio\outputwav\output.wav'
-    out_srt = r'C:\Users\ngodu\Desktop\Videos\2.TransferAudio\srt\output.srt'
+    wav = PROJECT_ROOT / "2.TransferAudio" / "outputwav" / "output.wav"
+    out_srt = PROJECT_ROOT / "2.TransferAudio" / "srt" / "output.srt"
+    out_srt.parent.mkdir(parents=True, exist_ok=True)
     convert_wav_to_srt(wav, out_srt, target_segments=50)

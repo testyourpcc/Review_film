@@ -1,14 +1,18 @@
 import ffmpeg
 import os
 import re
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 # Đường dẫn thư mục và tên file gốc
-output_folder = r'C:\Users\ngodu\Desktop\Videos\4.Final'
-video_path = r'C:\Users\ngodu\Desktop\Videos\2.TransferAudio\videonosounds\videonosounds.mp4'
-audio_path = r'C:\Users\ngodu\Desktop\Videos\2.TransferAudio\ouputsounds\output.mp3'
+output_folder = PROJECT_ROOT / "4.Final"
+video_path = PROJECT_ROOT / "2.TransferAudio" / "videonosounds" / "videonosounds.mp4"
+audio_path = PROJECT_ROOT / "2.TransferAudio" / "ouputsounds" / "output.mp3"
 
 # Tìm số lớn nhất hiện có trong folder
 def get_next_output_filename(folder):
+    folder.mkdir(parents=True, exist_ok=True)
     files = os.listdir(folder)
     numbers = []
     for f in files:
@@ -16,7 +20,7 @@ def get_next_output_filename(folder):
         if match:
             numbers.append(int(match.group(1)))
     next_number = max(numbers) + 1 if numbers else 1
-    return os.path.join(folder, f"{next_number}.mp4")
+    return folder / f"{next_number}.mp4"
 
 # Tạo output path mới
 output_path = get_next_output_filename(output_folder)
@@ -24,9 +28,9 @@ output_path = get_next_output_filename(output_folder)
 # Ghép video và audio
 ffmpeg \
     .output(
-        ffmpeg.input(video_path).video,
-        ffmpeg.input(audio_path).audio,
-        output_path,
+        ffmpeg.input(str(video_path)).video,
+        ffmpeg.input(str(audio_path)).audio,
+        str(output_path),
         vcodec='copy',
         acodec='aac',
         strict='experimental'

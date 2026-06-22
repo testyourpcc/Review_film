@@ -2,7 +2,10 @@ import pysrt
 from gtts import gTTS
 import subprocess
 import os
+from pathlib import Path
 from mutagen.mp3 import MP3
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 def get_mp3_duration(file_path: str) -> float:
     """
@@ -105,7 +108,7 @@ def speedup(input_file: str, original_duration: float, target_duration: float, o
 total = 0
 def adjust(input_path, speed):
     global total
-    subs = pysrt.open(input_path, encoding="utf-8")
+    subs = pysrt.open(str(input_path), encoding="utf-8")
     for sub in subs:
         print(sub.index, sub.start, sub.end, sub.text)
         duration = (sub.end.ordinal - sub.start.ordinal) / 1000.0
@@ -130,7 +133,7 @@ def merge(total):
 
     subprocess.run([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", "file_list.txt",
-        "-acodec", "libmp3lame", "-b:a", "128k", r"C:\Users\ngodu\Desktop\Videos\2.TransferAudio\ouputsounds\output.mp3"
+        "-acodec", "libmp3lame", "-b:a", "128k", str(PROJECT_ROOT / "2.TransferAudio" / "ouputsounds" / "output.mp3")
     ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
     os.remove("file_list.txt")
@@ -140,6 +143,7 @@ def merge(total):
             os.remove(f"adjusted{i}.mp3")
 
 if __name__ == "__main__":
-    input_path = r"C:\Users\ngodu\Desktop\Videos\2.TransferAudio\srt\output.srt"
+    (PROJECT_ROOT / "2.TransferAudio" / "ouputsounds").mkdir(parents=True, exist_ok=True)
+    input_path = PROJECT_ROOT / "2.TransferAudio" / "srt" / "output.srt"
     adjust(input_path, speed=1.5)
     merge(total)
