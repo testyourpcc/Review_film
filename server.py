@@ -12,7 +12,23 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-JOBS_DIR = PROJECT_ROOT / "jobs"
+
+
+def load_env_file(env_path):
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_env_file(PROJECT_ROOT / ".env")
+
+JOBS_DIR = Path(os.getenv("JOBS_DIR", PROJECT_ROOT / "jobs")).resolve()
+API_OUTPUT_ROOT = Path(os.getenv("API_OUTPUT_ROOT", PROJECT_ROOT / "output")).resolve()
 API_KEY = os.getenv("PIPELINE_API_KEY", "")
 
 app = FastAPI(title="Review Film Pipeline API", version="1.0.0")
@@ -48,8 +64,9 @@ def update_job(job_id, **updates):
 def run_pipeline_job(job_id, keep_temp):
     job_dir = JOBS_DIR / job_id
     urls_file = job_dir / "urls.txt"
-    output_dir = job_dir / "output"
+    output_dir = API_OUTPUT_ROOT / job_id
     log_path = job_dir / "run.log"
+    output_dir.mkdir(parents=True, exist_ok=True)
     command = [
         sys.executable,
         str(PROJECT_ROOT / "main.py"),
@@ -103,6 +120,7 @@ def run(request: RunRequest):
         "created_at": now_iso(),
         "updated_at": now_iso(),
         "files": [],
+        "output_dir": str(API_OUTPUT_ROOT / job_id),
         "log_url": f"/jobs/{job_id}/log",
     }
     executor.submit(run_pipeline_job, job_id, request.keep_temp)
@@ -133,7 +151,7 @@ def get_log(job_id: str):
 def download_file(job_id: str, file_name: str):
     if "/" in file_name or "\\" in file_name:
         raise HTTPException(status_code=400, detail="Invalid file name")
-    file_path = JOBS_DIR / job_id / "output" / file_name
+    file_path = API_OUTPUT_ROOT / job_id / file_name
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(str(file_path), media_type="video/mp4", filename=file_name)

@@ -15,6 +15,20 @@ MERGE_DIR = PROJECT_ROOT / "3.Merge"
 FINAL_DIR = PROJECT_ROOT / "4.Final"
 DRIVER_DIR = PROJECT_ROOT / "driver"
 
+
+def load_env_file(env_path):
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+load_env_file(PROJECT_ROOT / ".env")
+
 # Download step
 DOUYIN_URLS_FILE = DOWNLOAD_DIR / "videourls.txt"
 REAL_VIDEO_URLS_FILE = DOWNLOAD_DIR / "output_link_video.txt"

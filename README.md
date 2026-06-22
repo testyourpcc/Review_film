@@ -47,6 +47,17 @@ Windows PowerShell:
 $env:OPENAI_API_KEY="sk-..."
 ```
 
+Hoac tao file `.env` tu `.env.example`:
+
+```text
+OPENAI_API_KEY=sk-...
+PIPELINE_API_KEY=your-long-random-secret
+TRANSCRIBE_PROVIDER=openai
+OPENAI_TRANSCRIBE_MODEL=whisper-1
+```
+
+File `.env` da nam trong `.gitignore`, khong commit len GitHub.
+
 ## Chay Local
 
 Tao file URL, moi dong mot link Douyin:
@@ -112,7 +123,7 @@ curl http://YOUR_VM_IP:8000/jobs/JOB_ID \
   -H "X-API-Key: your-secret"
 ```
 
-Tai output:
+Tai output qua API:
 
 ```bash
 curl -L http://YOUR_VM_IP:8000/jobs/JOB_ID/files/1.mp4 \
@@ -128,6 +139,7 @@ curl http://YOUR_VM_IP:8000/jobs/JOB_ID/log \
 ```
 
 API hien chay queue tuan tu 1 job/luc de tranh xung dot file tam trong pipeline.
+Mac dinh output API nam trong `output/JOB_ID/1.mp4`.
 
 ## Chay Bang Docker
 
@@ -144,9 +156,9 @@ Run API container:
 
 ```bash
 docker run --rm -p 8000:8000 \
-  -e OPENAI_API_KEY="YOUR_OPENAI_KEY" \
-  -e PIPELINE_API_KEY="your-secret" \
-  -e TRANSCRIBE_PROVIDER="openai" \
+  --env-file .env \
+  -v "$(pwd)/output:/app/output" \
+  -v "$(pwd)/jobs:/app/jobs" \
   review-film-pipeline
 ```
 
@@ -154,13 +166,14 @@ Windows PowerShell:
 
 ```powershell
 docker run --rm -p 8000:8000 `
-  -e OPENAI_API_KEY="YOUR_OPENAI_KEY" `
-  -e PIPELINE_API_KEY="your-secret" `
-  -e TRANSCRIBE_PROVIDER="openai" `
+  --env-file .env `
+  -v "D:\Review_film\output:/app/output" `
+  -v "D:\Review_film\jobs:/app/jobs" `
   review-film-pipeline
 ```
 
 Sau do goi API nhu phan `Chay Bang API`.
+Voi lenh Windows tren, file hoan thanh se nam tai `D:\Review_film\output\JOB_ID\1.mp4`.
 
 Profile khuyen dung cho App Service/VM CPU:
 
@@ -234,6 +247,8 @@ Khuyen nghi de secret trong env:
 
 - `OPENAI_API_KEY`
 - `PIPELINE_API_KEY`
+- `API_OUTPUT_ROOT`
+- `JOBS_DIR`
 
 Khong commit API key that len GitHub.
 
