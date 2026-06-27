@@ -1,9 +1,17 @@
-ffmpeg_python==0.2.0
+# Tested runtime: Python 3.9.12 on Windows (64-bit)
+# setuptools 81+ removed pkg_resources, which breaks older Whisper builds.
+setuptools==80.9.0
+
+ffmpeg-python==0.2.0
 fastapi==0.115.6
 gTTS==2.5.4
 mutagen==1.47.0
+numpy==2.0.2
+openai-whisper==20250625
 pysrt==1.1.2
-Requests==2.32.3
+python-dotenv==1.2.1
+requests==2.32.3
 selenium==4.32.0
-selenium_stealth==1.0.6
+selenium-stealth==1.0.6
+torch==2.8.0
 uvicorn==0.34.0

@@ -3,21 +3,19 @@ import os
 
 def download_video(video_url, save_path):
     try:
-        # Gửi yêu cầu GET để tải video
-        print(f"⏳ Đang tải video từ: {video_url}")
-        response = requests.get(video_url, stream=True)
-
-        # Kiểm tra nếu yêu cầu thành công (status code 200)
-        if response.status_code == 200:
-            # Mở file ở chế độ ghi nhị phân và lưu video
+        # Keep console messages ASCII-only so this also works in legacy
+        # Windows terminals configured with cp1252 instead of UTF-8.
+        print(f"Downloading media from: {video_url}")
+        with requests.get(video_url, stream=True, timeout=120) as response:
+            response.raise_for_status()
             with open(save_path, 'wb') as file:
-                for chunk in response.iter_content(chunk_size=8192):  # Dùng chunk_size để tải file lớn
-                    file.write(chunk)
-            print(f"✅ Video đã được tải về thành công: {save_path}")
-        else:
-            print(f"❌ Không thể tải video. Mã lỗi: {response.status_code}")
-    except Exception as e:
-        print(f"⚠️ Đã xảy ra lỗi khi tải video: {e}")
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        file.write(chunk)
+        print(f"Media download complete: {save_path}")
+    except Exception as exc:
+        print(f"Media download failed: {exc!r}")
+        raise
 
 def download_videos_from_file(file_path, download_folder):
     # Đọc danh sách các URL từ file

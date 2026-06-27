@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 
 from selenium import webdriver
-from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
@@ -31,17 +31,23 @@ class VideoURLExtractor:
         chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
         chrome_options.add_experimental_option("useAutomationExtension", False)
         chrome_options.set_capability("goog:loggingPrefs", {"performance": "ALL"})
+        # Do not let driver.get() block until every Douyin resource finishes.
+        # find_media_urls() owns the 30-second readiness deadline instead.
+        chrome_options.page_load_strategy = "none"
 
         chrome_binary = os.getenv("CHROME_BIN")
         if chrome_binary:
             chrome_options.binary_location = chrome_binary
 
         try:
+            # Selenium Manager keeps the driver aligned with the installed Chrome.
+            self.driver = webdriver.Chrome(options=chrome_options)
+        except WebDriverException as exc:
+            print(f"Selenium Manager failed, retrying with local ChromeDriver: {exc.msg}")
             service = Service(self.chromedriver_path)
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
-        except WebDriverException as exc:
-            print(f"Local ChromeDriver failed, retrying with Selenium Manager: {exc.msg}")
-            self.driver = webdriver.Chrome(options=chrome_options)
+
+        self.driver.set_page_load_timeout(30)
 
         stealth(
             self.driver,
@@ -54,17 +60,40 @@ class VideoURLExtractor:
         )
 
     def is_video_url(self, url):
+        if not url or "douyinstatic.com" in url or self.is_audio_url(url):
+            return False
+        url_lower = url.lower()
+        return (
+            "media-video" in url_lower
+            or "mime_type=video" in url_lower
+            or "douyinvod.com" in url_lower
+            or "/video/tos" in url_lower
+        )
+
+    def is_audio_url(self, url):
         if not url or "douyinstatic.com" in url:
             return False
-        return "douyinvod.com" in url or "/video/tos" in url
-
-    def find_video_url(self, timeout_seconds=45):
-        WebDriverWait(self.driver, 30).until(
-            lambda driver: driver.execute_script("return document.readyState") == "complete"
+        url_lower = url.lower()
+        return (
+            "media-audio" in url_lower
+            or "mime_type=audio" in url_lower
+            or "/audio/tos" in url_lower
+            or "/audio/" in url_lower and "mp4a" in url_lower
         )
+
+    def find_media_urls(self, timeout_seconds=45, grace_seconds=10):
+        try:
+            WebDriverWait(self.driver, 30).until(
+                lambda driver: driver.execute_script("return document.readyState") == "complete"
+            )
+        except TimeoutException:
+            print("Page did not finish loading after 30 seconds; scanning captured network requests anyway.")
 
         deadline = time.time() + timeout_seconds
         seen_urls = set()
+        video_url = None
+        audio_url = None
+        video_found_at = None
         while time.time() < deadline:
             time.sleep(1)
             try:
@@ -86,20 +115,32 @@ class VideoURLExtractor:
                         continue
                     seen_urls.add(url)
 
-                    if self.is_video_url(url):
-                        return url
+                    if self.is_audio_url(url):
+                        audio_url = audio_url or url
+                    elif self.is_video_url(url):
+                        if video_url is None:
+                            video_url = url
+                            video_found_at = time.time()
                 except Exception:
                     continue
+
+            if video_url and audio_url:
+                return video_url, audio_url
+
+            # A normal MP4 may already contain audio. Give the page a short
+            # window to expose a separate DASH audio request before returning.
+            if video_url and video_found_at and time.time() - video_found_at >= grace_seconds:
+                return video_url, audio_url
 
             try:
                 self.driver.execute_script("window.scrollBy(0, 300);")
             except Exception:
                 pass
 
-        return None
+        return video_url, audio_url
 
     def write_header(self):
-        video_url = self.find_video_url()
+        video_url, audio_url = self.find_media_urls()
 
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.file_path, "w", encoding="utf-8") as file:
@@ -117,11 +158,17 @@ class VideoURLExtractor:
             )
 
         print(f"Video URL saved to: {self.file_path}")
+        if audio_url:
+            print("Separate Douyin audio stream detected.")
+        return video_url, audio_url
 
     def run(self):
         self.setup_driver()
         try:
-            self.driver.get(self.video_url)
-            self.write_header()
+            try:
+                self.driver.get(self.video_url)
+            except TimeoutException:
+                print("Navigation exceeded 30 seconds; using captured network requests.")
+            return self.write_header()
         finally:
             self.driver.quit()
