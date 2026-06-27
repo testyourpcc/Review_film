@@ -37,4 +37,4 @@ ffmpeg \
     ) \
     .run()
 
-print(f"✅ Xuất video hoàn tất: {output_path}")
+print(f"Final video created: {output_path}")

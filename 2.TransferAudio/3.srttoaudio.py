@@ -2,10 +2,17 @@ import pysrt
 from gtts import gTTS
 import subprocess
 import os
+import sys
 from pathlib import Path
 from mutagen.mp3 import MP3
+from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(PROJECT_ROOT / ".env")
+BASE_TTS_SPEED = float(os.getenv("TTS_BASE_SPEED", "1.60"))
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 def get_mp3_duration(file_path: str) -> float:
     """
@@ -108,23 +115,53 @@ def speedup(input_file: str, original_duration: float, target_duration: float, o
 total = 0
 def adjust(input_path, speed):
     global total
+    total = 0
     subs = pysrt.open(str(input_path), encoding="utf-8")
+    timeline_cursor = 0.0
     for sub in subs:
         print(sub.index, sub.start, sub.end, sub.text)
+        start_time = sub.start.ordinal / 1000.0
+        end_time = sub.end.ordinal / 1000.0
         duration = (sub.end.ordinal - sub.start.ordinal) / 1000.0
-        create_tts_with_speed(sub.text, lang="vi", speed=speed, output_file=f"tmp{sub.index}.mp3")
-        tmp_duration = get_mp3_duration(f"tmp{sub.index}.mp3")
+        text = sub.text.strip()
+
+        gap = start_time - timeline_cursor
+        if gap > 0.001:
+            gap_file = f"adjusted{total + 1}.mp3"
+            print(f"Inserting {gap:.3f}s gap before subtitle {sub.index}")
+            add_silence(gap, gap_file)
+            total += 1
+
+        if duration <= 0:
+            print(f"Skipping subtitle {sub.index}: duration is {duration:.3f}s")
+            timeline_cursor = max(timeline_cursor, end_time)
+            continue
+
+        clip_index = total + 1
+        adjusted_file = f"adjusted{clip_index}.mp3"
+
+        if not text:
+            print(f"Subtitle {sub.index} is empty; inserting {duration:.3f}s of silence")
+            add_silence(duration, adjusted_file)
+            total += 1
+            timeline_cursor = max(timeline_cursor, end_time)
+            continue
+
+        temp_file = f"tmp{clip_index}.mp3"
+        create_tts_with_speed(text, lang="vi", speed=speed, output_file=temp_file)
+        tmp_duration = get_mp3_duration(temp_file)
         difference = duration - tmp_duration
         if difference > 0:
             add_silence(difference, "silence.mp3")
-            merge_mp3(f"tmp{sub.index}.mp3", "silence.mp3", f"adjusted{sub.index}.mp3")
+            merge_mp3(temp_file, "silence.mp3", adjusted_file)
         elif difference < 0:
-            speedup(f"tmp{sub.index}.mp3", tmp_duration, duration, f"adjusted{sub.index}.mp3")
-            os.remove(f"tmp{sub.index}.mp3")
+            speedup(temp_file, tmp_duration, duration, adjusted_file)
+            os.remove(temp_file)
         else:
-            os.rename(f"tmp{sub.index}.mp3", f"adjusted{sub.index}.mp3")
+            os.rename(temp_file, adjusted_file)
 
         total += 1
+        timeline_cursor = max(timeline_cursor, end_time)
 
 def merge(total):
     with open("file_list.txt", "w", encoding="utf-8") as f:
@@ -145,5 +182,7 @@ def merge(total):
 if __name__ == "__main__":
     (PROJECT_ROOT / "2.TransferAudio" / "ouputsounds").mkdir(parents=True, exist_ok=True)
     input_path = PROJECT_ROOT / "2.TransferAudio" / "srt" / "output.srt"
-    adjust(input_path, speed=1.5)
+    # Keep the base voice close to natural speed. Individual lines are only
+    # accelerated further when their generated audio exceeds the SRT slot.
+    adjust(input_path, speed=BASE_TTS_SPEED)
     merge(total)

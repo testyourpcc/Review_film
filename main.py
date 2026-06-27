@@ -7,33 +7,25 @@ import subprocess
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # Project paths
 PROJECT_ROOT = Path(__file__).resolve().parent
+load_dotenv(PROJECT_ROOT / ".env")
+
 DOWNLOAD_DIR = PROJECT_ROOT / "1.DownloadVideos"
 TRANSFER_DIR = PROJECT_ROOT / "2.TransferAudio"
 MERGE_DIR = PROJECT_ROOT / "3.Merge"
 FINAL_DIR = PROJECT_ROOT / "4.Final"
 DRIVER_DIR = PROJECT_ROOT / "driver"
 
-
-def load_env_file(env_path):
-    if not env_path.exists():
-        return
-    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
-
-
-load_env_file(PROJECT_ROOT / ".env")
-
 # Download step
 DOUYIN_URLS_FILE = DOWNLOAD_DIR / "videourls.txt"
 REAL_VIDEO_URLS_FILE = DOWNLOAD_DIR / "output_link_video.txt"
 CHROMEDRIVER_PATH = DRIVER_DIR / "chromedriver.exe"
 DOWNLOADED_VIDEO_PATH = DOWNLOAD_DIR / "output" / "1.mp4"
+DOWNLOADED_AUDIO_PATH = DOWNLOAD_DIR / "output" / "source_audio.m4a"
+MUXED_VIDEO_PATH = DOWNLOAD_DIR / "output" / "1.muxed.mp4"
 
 # Audio/subtitle step
 OUTPUT_WAV_PATH = TRANSFER_DIR / "outputwav" / "output.wav"
@@ -44,19 +36,24 @@ VIETNAMESE_AUDIO_PATH = TRANSFER_DIR / "ouputsounds" / "output.mp3"
 MIN_VIDEO_DURATION_SECONDS = 5
 
 # OpenAI translation step
-# Set OPENAI_API_KEY in your shell before running, or paste it locally here.
+# Loaded from .env or the current process environment.
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
 TRANSCRIBE_PROVIDER = os.getenv("TRANSCRIBE_PROVIDER", "openai")
 WHISPER_MODEL = os.getenv("WHISPER_MODEL", "medium")
 OPENAI_TRANSCRIBE_MODEL = os.getenv("OPENAI_TRANSCRIBE_MODEL", "whisper-1")
 TRANSLATE_WORDS_PER_MINUTE = 190
+TRANSLATE_MAX_WORDS_PER_MINUTE = 220
 TRANSLATE_BATCH_SIZE = 12
+TRANSLATE_CONTEXT_SEGMENTS = 3
 TRANSLATE_REVIEW_PASSES = 2
-TRANSLATE_TOLERANCE_WORDS = 2
+TRANSLATE_TOLERANCE_WORDS = 1
 TRANSLATE_TIMEOUT_SECONDS = 120
 TRANSLATE_RETRIES = 3
-TRANSLATE_STYLE = "Gen Z, cuon, gon, hop review phim/video ngan"
+TRANSLATE_STYLE = (
+    "Gen Z Viet Nam dung khau ngu doi thuong, noi chuyen co duyen va co nhip; "
+    "cau ngan, gon, co cam xuc, khong van viet, khong dich sat chu, khong lam dung tieng long"
+)
 
 # Final merge step
 FINAL_OUTPUT_DIR = FINAL_DIR
@@ -69,6 +66,34 @@ def run_script(script_path, cwd=None):
 
 def run_capture(command):
     return subprocess.run(command, check=True, capture_output=True, text=True)
+
+
+def configure_media_tools():
+    """Ensure ffmpeg and ffprobe are available to this process and child scripts."""
+    if shutil.which("ffmpeg") and shutil.which("ffprobe"):
+        return
+
+    # WinGet installs Gyan.FFmpeg here, but an already-open terminal may not
+    # receive the updated PATH. Discover it so the project can run immediately.
+    local_app_data = os.getenv("LOCALAPPDATA")
+    if local_app_data:
+        winget_packages = Path(local_app_data) / "Microsoft" / "WinGet" / "Packages"
+        candidates = sorted(
+            winget_packages.glob("Gyan.FFmpeg_*/ffmpeg-*/bin"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        for bin_dir in candidates:
+            if (bin_dir / "ffmpeg.exe").is_file() and (bin_dir / "ffprobe.exe").is_file():
+                os.environ["PATH"] = f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"
+                break
+
+    missing = [tool for tool in ("ffmpeg", "ffprobe") if not shutil.which(tool)]
+    if missing:
+        raise RuntimeError(
+            f"Missing media tools: {', '.join(missing)}. "
+            "Install FFmpeg and make sure its bin folder is in PATH."
+        )
 
 
 def remove_path(path):
@@ -88,11 +113,14 @@ def clean_intermediate_files(clean_final_temp=True):
     paths = [
         REAL_VIDEO_URLS_FILE,
         DOWNLOADED_VIDEO_PATH,
+        DOWNLOADED_AUDIO_PATH,
+        MUXED_VIDEO_PATH,
         OUTPUT_WAV_PATH,
         VIDEO_NO_SOUND_PATH,
         SOURCE_SRT_PATH,
         VIETNAMESE_SRT_PATH,
         VIETNAMESE_SRT_PATH.with_suffix(".report.txt"),
+        VIETNAMESE_SRT_PATH.with_suffix(".context.json"),
         VIETNAMESE_AUDIO_PATH,
         PROJECT_ROOT / "alert.txt",
         TRANSFER_DIR / "video_urls.txt",
@@ -129,24 +157,64 @@ def load_download_modules():
     return downloader_module.VideoURLExtractor, videos_module.download_video
 
 
-def extract_real_video_url(douyin_url):
+def extract_real_media_urls(douyin_url):
     VideoURLExtractor, _ = load_download_modules()
     remove_path(REAL_VIDEO_URLS_FILE)
     extractor = VideoURLExtractor(video_url=douyin_url, chromedriver_path=CHROMEDRIVER_PATH)
-    extractor.run()
+    video_url, audio_url = extractor.run()
 
-    urls = read_video_urls(REAL_VIDEO_URLS_FILE)
-    return urls[0]
+    if not video_url:
+        urls = read_video_urls(REAL_VIDEO_URLS_FILE)
+        video_url = urls[0]
+    return video_url, audio_url
+
+
+def mux_douyin_streams(video_path, audio_path):
+    remove_path(MUXED_VIDEO_PATH)
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(video_path),
+            "-i",
+            str(audio_path),
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c",
+            "copy",
+            "-shortest",
+            str(MUXED_VIDEO_PATH),
+        ],
+        check=True,
+    )
+    remove_path(video_path)
+    shutil.move(str(MUXED_VIDEO_PATH), str(video_path))
 
 
 def download_video(douyin_url):
     _, download_video_func = load_download_modules()
-    real_video_url = extract_real_video_url(douyin_url)
+    real_video_url, real_audio_url = extract_real_media_urls(douyin_url)
     DOWNLOADED_VIDEO_PATH.parent.mkdir(parents=True, exist_ok=True)
     remove_path(DOWNLOADED_VIDEO_PATH)
+    remove_path(DOWNLOADED_AUDIO_PATH)
+    remove_path(MUXED_VIDEO_PATH)
     download_video_func(real_video_url, str(DOWNLOADED_VIDEO_PATH))
     if not DOWNLOADED_VIDEO_PATH.exists():
         raise RuntimeError(f"Download failed: {DOWNLOADED_VIDEO_PATH}")
+
+    if real_audio_url:
+        print("Downloading separate Douyin audio stream...")
+        download_video_func(real_audio_url, str(DOWNLOADED_AUDIO_PATH))
+        if not DOWNLOADED_AUDIO_PATH.exists():
+            raise RuntimeError(f"Audio download failed: {DOWNLOADED_AUDIO_PATH}")
+        try:
+            mux_douyin_streams(DOWNLOADED_VIDEO_PATH, DOWNLOADED_AUDIO_PATH)
+        finally:
+            remove_path(DOWNLOADED_AUDIO_PATH)
+
     validate_downloaded_video(DOWNLOADED_VIDEO_PATH, real_video_url)
 
 
@@ -274,6 +342,7 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
+    configure_media_tools()
     output_dir = Path(args.output).resolve()
     clean_final_temp = output_dir != FINAL_DIR.resolve()
     clean_intermediate_files(clean_final_temp=clean_final_temp)

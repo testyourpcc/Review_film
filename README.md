@@ -2,6 +2,29 @@
 
 Pipeline tu dong de tai video Douyin, tach audio, tao SRT bang OpenAI transcription API, dich/bien tap SRT sang tieng Viet bang OpenAI API, tao voice TTS tieng Viet, ghep lai video va lam sach metadata dau ra.
 
+## Baseline On Dinh Da Kiem Thu
+
+Day la moc local tot nhat da duoc kiem tra end-to-end. Khi AI/developer khac tiep quan, hay giu nguyen baseline nay truoc khi tinh chinh tung bien:
+
+- Windows 64-bit, Python `3.9.12` native.
+- NVIDIA RTX 5060 Ti 16 GB, PyTorch `2.8.0+cu128`, Whisper local nhan CUDA.
+- Chrome `149`; uu tien Selenium Manager, ChromeDriver trong `driver/` chi la fallback.
+- FFmpeg `8.1.1` tu WinGet package `Gyan.FFmpeg`.
+- `TRANSCRIBE_PROVIDER=local`, `WHISPER_MODEL=large`.
+- `OPENAI_MODEL=gpt-5.4-mini`, `TTS_BASE_SPEED=1.60`.
+- Dich muc tieu `190` tu/phut, nguong uu tien `220` tu/phut.
+
+Nhung sua loi quan trong trong baseline:
+
+- Downloader bat duoc MP4 co audio hoac DASH tach video/audio, sau do mux bang FFmpeg.
+- Chrome khong cho `driver.get()` treo vo han; sau toi da 30 giay pipeline doc network log da bat duoc.
+- Subtitle nguon rong/0 giay bi loai truoc khi dich, tranh AI tu bia noi dung.
+- Buoc dich tao story bible, kiem tra nhan vat/glossary, cam de sot chu Han trong output Viet, sau do dich toan transcript va chi rut gon cau qua dai.
+- TTS bo segment 0 giay, chen silence dung cac khoang trong timeline va danh so clip lien tuc.
+- `.env`, `videosurl.txt`, SRT, audio/video tam va output deu khong duoc commit.
+
+Khong doi dong thoi model, prompt, WPM va TTS speed. Moi lan chi doi mot bien va chay `--keep-temp` de so sanh `output.srt`, `output_vi.srt`, `output_vi.context.json` va `output_vi.report.txt`.
+
 Ban nay co the chay theo 2 kieu:
 
 - Local CLI: chay truc tiep tren may.
@@ -26,6 +49,16 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 ```
+
+Neu dung local GPU nhu baseline, thay PyTorch CPU bang CUDA 12.8:
+
+```powershell
+python -m pip uninstall -y torch
+python -m pip install --no-cache-dir torch==2.8.0 --index-url https://download.pytorch.org/whl/cu128
+python -c "import torch; print(torch.__version__); print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
+```
+
+Ket qua can co `+cu128`, `True` va ten GPU NVIDIA.
 
 Windows PowerShell:
 
@@ -52,8 +85,11 @@ Hoac tao file `.env` tu `.env.example`:
 ```text
 OPENAI_API_KEY=sk-...
 PIPELINE_API_KEY=your-long-random-secret
-TRANSCRIBE_PROVIDER=openai
+TRANSCRIBE_PROVIDER=local
+WHISPER_MODEL=large
 OPENAI_TRANSCRIBE_MODEL=whisper-1
+OPENAI_MODEL=gpt-5.4-mini
+TTS_BASE_SPEED=1.60
 ```
 
 File `.env` da nam trong `.gitignore`, khong commit len GitHub.
@@ -239,8 +275,10 @@ Trong `main.py`:
 - `OPENAI_TRANSCRIBE_MODEL`
 - `WHISPER_MODEL`
 - `TRANSLATE_WORDS_PER_MINUTE`
+- `TRANSLATE_MAX_WORDS_PER_MINUTE`
 - `TRANSLATE_BATCH_SIZE`
 - `TRANSLATE_REVIEW_PASSES`
+- `TTS_BASE_SPEED` trong `.env`
 - `MIN_VIDEO_DURATION_SECONDS`
 
 Khuyen nghi de secret trong env:
@@ -255,6 +293,10 @@ Khong commit API key that len GitHub.
 ## Ghi Chu
 
 ChromeDriver local trong `driver/` chi la fallback. Neu bi lech version, Selenium Manager se tu detect Chrome va tai driver phu hop.
+
+Canh bao Triton thieu CUDA toolkit tren Windows chi lam cham mot phan can timestamp; nhan dang chinh van chay GPU neu `torch.cuda.is_available()` la `True`.
+
+MoviePy/FFmpeg co the canh bao thieu 1-3 frame cuoi va dung frame hop le cuoi cung. Neu duration dau ra day du va co ca stream video/audio thi day khong phai loi dung pipeline.
 
 Tag on dinh dau tien cua ban API + local la:
 
